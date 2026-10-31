@@ -64,7 +64,7 @@
   }
   .bar button:active { background: #eee; }
 
-  /* Gemeinsames Raster für Kopf und Zeilen */
+  /* Gemeinsames Raster f&#xfc;r Kopf und Zeilen */
   .grid {
     display: grid;
     grid-template-columns: 78px 1fr 1fr 22px;
@@ -233,9 +233,9 @@
     <div class="bar">
       <span class="title">Gecko Tracker</span>
       <div>
-        <button id="btnTheme" type="button" aria-label="Dunkelmodus umschalten">🌙</button>
+        <button id="btnTheme" type="button" aria-label="Dunkelmodus umschalten">&#x1f319;</button>
         <button id="btnToday" type="button">Heute</button>
-        <button id="btnSettings" type="button" aria-label="Einstellungen">⚙</button>
+        <button id="btnSettings" type="button" aria-label="Einstellungen">&#x2699;</button>
       </div>
     </div>
     <div class="grid" id="colhead">
@@ -255,7 +255,12 @@
   <h2>Einstellungen</h2>
   <form method="dialog" id="dlgForm" onsubmit="return false"></form>
   <div class="dlg-actions">
-    <button type="button" class="danger" id="btnReset">Alle Daten löschen</button>
+    <button type="button" id="btnExport">Exportieren</button>
+    <button type="button" id="btnImport">Importieren</button>
+    <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+  </div>
+  <div class="dlg-actions">
+    <button type="button" class="danger" id="btnReset">Alle Daten l&#xf6;schen</button>
     <div>
       <button type="button" id="btnCancel">Abbrechen</button>
       <button type="button" class="primary" id="btnSave">Speichern</button>
@@ -305,7 +310,7 @@
   const RANGE_END = addDays(today, 365);
   const todayKey = iso(today);
 
-  // Zähler: Tage seit dem letzten Drücken (am Drücktag leer, am Folgetag 1, dann 2 ...)
+  // Z\u00e4hler: Tage seit dem letzten Dr\u00fccken (am Dr\u00fccktag leer, am Folgetag 1, dann 2 ...)
   function computeCounters() {
     const keys = Object.keys(state.days).sort();
     let start = RANGE_START;
@@ -383,7 +388,7 @@
     scroller.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
   }
 
-  // Tasten drücken
+  // Tasten dr\u00fccken
   list.addEventListener('click', e => {
     const btn = e.target.closest('.btn');
     if (!btn) return;
@@ -442,7 +447,7 @@
   document.getElementById('btnCancel').addEventListener('click', () => dlg.close());
 
   document.getElementById('btnReset').addEventListener('click', () => {
-    if (confirm('Alle erfassten Tage unwiderruflich löschen?')) {
+    if (confirm('Alle erfassten Tage unwiderruflich l\u00f6schen?')) {
       state.days = {};
       save();
       render();
@@ -456,13 +461,49 @@
   const themeBtn = document.getElementById('btnTheme');
   function applyTheme(dark) {
     document.body.classList.toggle('dark', dark);
-    themeBtn.textContent = dark ? '☀️' : '🌙';
+    themeBtn.textContent = dark ? '\u2600\ufe0f' : '\ud83c\udf19';
     try { localStorage.setItem('gecko.theme', dark ? 'dark' : 'light'); } catch (e) {}
   }
   themeBtn.addEventListener('click', () => applyTheme(!document.body.classList.contains('dark')));
   let storedTheme = null;
   try { storedTheme = localStorage.getItem('gecko.theme'); } catch (e) {}
   applyTheme(storedTheme ? storedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Export / Import
+  document.getElementById('btnExport').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gecko-tracker-' + todayKey + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  });
+
+  const fileInput = document.getElementById('fileImport');
+  document.getElementById('btnImport').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    fileInput.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data = null;
+      try { data = JSON.parse(reader.result); } catch (err) { data = null; }
+      if (!data || !Array.isArray(data.cols) || !data.days || typeof data.days !== 'object') {
+        alert('Die Datei passt nicht zum Gecko Tracker.');
+        return;
+      }
+      if (!confirm('Alle aktuellen Eintr\u00e4ge durch den Inhalt der Datei ersetzen?')) return;
+      state = data;
+      save();
+      renderHeader();
+      render();
+      dlg.close();
+    };
+    reader.readAsText(file);
+  });
 
   // Start
   renderHeader();
