@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gecko Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #c9ccd3;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #222;
+  }
+
+  /* Simuliertes Hochkant-Handy */
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #f6f6f8;
+    border: 12px solid #151515;
+    border-radius: 46px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  @media (max-height: 900px) {
+    .phone { height: calc(100vh - 32px); }
+  }
+  @media (max-width: 500px) {
+    body { background: #f6f6f8; display: block; min-height: 0; }
+    .phone { width: 100%; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+  }
+
+  /* Fixer oberer Bereich */
+  .top {
+    flex: 0 0 auto;
+    background: #fff;
+    border-bottom: 1px solid #d8d8de;
+    padding: 12px 12px 6px;
+    z-index: 2;
+  }
+  .bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .title { font-weight: 800; font-size: 18px; }
+  .bar button {
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font: 600 13px system-ui;
+    cursor: pointer;
+    margin-left: 6px;
+  }
+  .bar button:active { background: #eee; }
+
+  /* Gemeinsames Raster für Kopf und Zeilen */
+  .grid {
+    display: grid;
+    grid-template-columns: 78px 1fr 1fr 22px;
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .coltitle {
+    width: 100%;
+    border: 0;
+    border-bottom: 3px solid var(--a);
+    background: transparent;
+    text-align: center;
+    font: 700 14px system-ui;
+    padding: 6px 2px;
+    color: #222;
+    outline: none;
+  }
+  .coltitle:focus { background: #f0f0f4; }
+
+  /* Scrollbarer Hauptbereich */
+  .scroller {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 0 60px;
+  }
+  .row { margin-bottom: 8px; }
+  .row.grid { padding: 0 12px; }
+  .row .date {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.25;
+    border-radius: 10px;
+  }
+  .row .date b { font-size: 15px; color: #333; }
+  .row.today .date {
+    background: #ffe38a;
+    color: #000;
+    font-weight: 700;
+  }
+  .row.today .date b { color: #000; }
+
+  /* Dreigeteilte Kachel */
+  .tile {
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #bcbcc4;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .btn {
+    flex: 1 1 0;
+    position: relative;
+    border: 0;
+    border-top: 1px solid #d6d6dc;
+    background: #fff;
+    color: #333;
+    font: 600 15px system-ui;
+    text-align: left;
+    padding: 0 26px 0 8px;
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .btn:first-child { border-top: 0; }
+  .btn:active { filter: brightness(.92); }
+  .btn.on {
+    background: var(--a);
+    color: #fff;
+  }
+  .lbl {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cnt {
+    position: absolute;
+    right: 7px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    font-weight: 700;
+    opacity: .75;
+    pointer-events: none;
+  }
+
+  /* Einstellungsdialog */
+  dialog {
+    border: 0;
+    border-radius: 16px;
+    padding: 18px;
+    width: 320px;
+    max-width: 90%;
+    box-shadow: 0 10px 40px rgba(0,0,0,.3);
+    font: 14px system-ui;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h2 { margin: 0 0 10px; font-size: 17px; }
+  fieldset {
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    margin: 0 0 10px;
+    padding: 8px 10px 10px;
+  }
+  legend { font-weight: 700; padding: 0 4px; }
+  label { display: block; font-size: 12px; color: #555; margin: 6px 0 2px; }
+  input[type=text] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    font: 14px system-ui;
+  }
+  .dlg-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .dlg-actions button {
+    border: 1px solid #bbb;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font: 600 13px system-ui;
+    cursor: pointer;
+  }
+  .dlg-actions .primary { background: #222; color: #fff; border-color: #222; }
+  .dlg-actions .danger { color: #b00020; border-color: #e0a0a8; }
+  /* Dunkelmodus */
+  body.dark { background: #0b0f0d; }
+  body.dark .phone { background: #121816; border-color: #050605; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  body.dark .top { background: #18201d; border-bottom-color: #2a3531; }
+  body.dark .title { color: #e6f2ea; }
+  body.dark .bar button { background: #22302b; border-color: #3a4a44; color: #e6f2ea; }
+  body.dark .coltitle { color: #e6f2ea; }
+  body.dark .coltitle:focus { background: #22302b; }
+  body.dark .row .date { color: #9fb3aa; }
+  body.dark .row .date b { color: #e6f2ea; }
+  body.dark .row.today .date { background: #4a5a1e; color: #f4ffd6; }
+  body.dark .row.today .date b { color: #f4ffd6; }
+  body.dark .tile { background: #1a2321; border-color: #33413c; }
+  body.dark .btn { background: #1a2321; color: #e6f2ea; border-top-color: #33413c; }
+  body.dark .btn.on { background: var(--a); color: #fff; }
+  body.dark dialog { background: #18201d; color: #e6f2ea; }
+  body.dark fieldset { border-color: #33413c; }
+  body.dark label { color: #9fb3aa; }
+  body.dark input[type=text] { background: #0f1512; color: #e6f2ea; border-color: #3a4a44; }
+  body.dark .dlg-actions button { background: #22302b; border-color: #3a4a44; color: #e6f2ea; }
+  body.dark .dlg-actions .primary { background: #7fd3a0; color: #0b0f0d; border-color: #7fd3a0; }
+  body.dark .dlg-actions .danger { color: #ff8a9a; border-color: #6a3a42; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <header class="top">
+    <div class="bar">
+      <span class="title">Gecko Tracker</span>
+      <div>
+        <button id="btnTheme" type="button" aria-label="Dunkelmodus umschalten">🌙</button>
+        <button id="btnToday" type="button">Heute</button>
+        <button id="btnSettings" type="button" aria-label="Einstellungen">⚙</button>
+      </div>
+    </div>
+    <div class="grid" id="colhead">
+      <div></div>
+      <input class="coltitle" data-c="0" type="text" maxlength="20" aria-label="Titel Spalte 1">
+      <input class="coltitle" data-c="1" type="text" maxlength="20" aria-label="Titel Spalte 2">
+      <div></div>
+    </div>
+  </header>
+
+  <main class="scroller" id="scroller">
+    <div id="list"></div>
+  </main>
+</div>
+
+<dialog id="dlg">
+  <h2>Einstellungen</h2>
+  <form method="dialog" id="dlgForm" onsubmit="return false"></form>
+  <div class="dlg-actions">
+    <button type="button" class="danger" id="btnReset">Alle Daten löschen</button>
+    <div>
+      <button type="button" id="btnCancel">Abbrechen</button>
+      <button type="button" class="primary" id="btnSave">Speichern</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  const KEY = 'arttracker.v1';
+  const DAY = 86400000;
+  const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  const ACC = ['#2a9d8f', '#e76f51'];
+
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const diff = (a, b) => Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) -
+                                     Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / DAY);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function defaultState() {
+    return {
+      cols: [
+        { title: 'Spalte 1', labels: ['Ereignis 1', 'Ereignis 2', 'Ereignis 3'] },
+        { title: 'Spalte 2', labels: ['Ereignis 1', 'Ereignis 2', 'Ereignis 3'] }
+      ],
+      days: {}
+    };
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && Array.isArray(s.cols) && s.days) return s;
+    } catch (e) {}
+    return defaultState();
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  let state = load();
+
+  const today = (() => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();
+  const RANGE_START = addDays(today, -365);
+  const RANGE_END = addDays(today, 365);
+  const todayKey = iso(today);
+
+  // Zähler: Tage seit dem letzten Drücken (am Drücktag leer, am Folgetag 1, dann 2 ...)
+  function computeCounters() {
+    const keys = Object.keys(state.days).sort();
+    let start = RANGE_START;
+    if (keys.length && parse(keys[0]) < start) start = parse(keys[0]);
+
+    const out = {};
+    const last = [[null, null, null], [null, null, null]];
+    for (let d = start; d <= RANGE_END; d = addDays(d, 1)) {
+      const k = iso(d);
+      const p = state.days[k] || [];
+      const row = [[], []];
+      for (let c = 0; c < 2; c++) {
+        for (let b = 0; b < 3; b++) {
+          const on = !!(p[c] && p[c][b]);
+          if (on) {
+            last[c][b] = d;
+            row[c][b] = null;
+          } else {
+            row[c][b] = last[c][b] ? diff(last[c][b], d) : null;
+          }
+        }
+      }
+      out[k] = row;
+    }
+    return out;
+  }
+
+  const list = document.getElementById('list');
+  const scroller = document.getElementById('scroller');
+
+  function render() {
+    const keep = scroller.scrollTop;
+    const cnt = computeCounters();
+    let html = '';
+    for (let d = RANGE_START; d <= RANGE_END; d = addDays(d, 1)) {
+      const k = iso(d);
+      const p = state.days[k] || [];
+      const c = cnt[k];
+      const isT = k === todayKey;
+      html += '<div class="row grid' + (isT ? ' today' : '') + '" id="r-' + k + '">';
+      html += '<div class="date"><span>' + WD[d.getDay()] + '</span><b>' +
+              d.getDate() + '.' + (d.getMonth() + 1) + '.</b></div>';
+      for (let ci = 0; ci < 2; ci++) {
+        html += '<div class="tile" style="--a:' + ACC[ci] + '">';
+        for (let b = 0; b < 3; b++) {
+          const on = !!(p[ci] && p[ci][b]);
+          const v = c[ci][b];
+          html += '<button type="button" class="btn' + (on ? ' on' : '') + '"' +
+                  ' data-d="' + k + '" data-c="' + ci + '" data-b="' + b + '"' +
+                  ' style="--a:' + ACC[ci] + '">' +
+                  '<span class="lbl">' + esc(state.cols[ci].labels[b]) + '</span>' +
+                  '<span class="cnt">' + (v === null || v === undefined ? '' : v) + '</span>' +
+                  '</button>';
+        }
+        html += '</div>';
+      }
+      html += '<div></div></div>';
+    }
+    list.innerHTML = html;
+    scroller.scrollTop = keep;
+  }
+
+  function renderHeader() {
+    document.querySelectorAll('.coltitle').forEach(inp => {
+      const c = +inp.dataset.c;
+      inp.value = state.cols[c].title;
+      inp.style.setProperty('--a', ACC[c]);
+    });
+  }
+
+  function scrollToToday(smooth) {
+    const r = document.getElementById('r-' + todayKey);
+    if (!r) return;
+    const top = r.offsetTop - (scroller.clientHeight - r.offsetHeight) / 2;
+    scroller.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  // Tasten drücken
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('.btn');
+    if (!btn) return;
+    const k = btn.dataset.d, c = +btn.dataset.c, b = +btn.dataset.b;
+    if (!state.days[k]) state.days[k] = [[false, false, false], [false, false, false]];
+    state.days[k][c][b] = !state.days[k][c][b];
+    const any = state.days[k].some(col => col.some(Boolean));
+    if (!any) delete state.days[k];
+    save();
+    render();
+  });
+
+  // Spaltentitel direkt umbenennen
+  document.querySelectorAll('.coltitle').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const c = +e.target.dataset.c;
+      state.cols[c].title = e.target.value.trim() || ('Spalte ' + (c + 1));
+      e.target.value = state.cols[c].title;
+      save();
+    });
+  });
+
+  // Einstellungsdialog
+  const dlg = document.getElementById('dlg');
+  const dlgForm = document.getElementById('dlgForm');
+
+  document.getElementById('btnSettings').addEventListener('click', () => {
+    let html = '';
+    for (let c = 0; c < 2; c++) {
+      html += '<fieldset><legend>Spalte ' + (c + 1) + '</legend>';
+      html += '<label>Spaltentitel</label><input type="text" maxlength="20" name="t' + c + '" value="' + esc(state.cols[c].title) + '">';
+      for (let b = 0; b < 3; b++) {
+        html += '<label>Ereignis ' + (b + 1) + '</label><input type="text" maxlength="24" name="l' + c + '_' + b + '" value="' + esc(state.cols[c].labels[b]) + '">';
+      }
+      html += '</fieldset>';
+    }
+    dlgForm.innerHTML = html;
+    dlg.showModal();
+  });
+
+  document.getElementById('btnSave').addEventListener('click', () => {
+    for (let c = 0; c < 2; c++) {
+      const t = dlgForm.elements['t' + c].value.trim();
+      state.cols[c].title = t || ('Spalte ' + (c + 1));
+      for (let b = 0; b < 3; b++) {
+        const l = dlgForm.elements['l' + c + '_' + b].value.trim();
+        state.cols[c].labels[b] = l || ('Ereignis ' + (b + 1));
+      }
+    }
+    save();
+    renderHeader();
+    render();
+    dlg.close();
+  });
+
+  document.getElementById('btnCancel').addEventListener('click', () => dlg.close());
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    if (confirm('Alle erfassten Tage unwiderruflich löschen?')) {
+      state.days = {};
+      save();
+      render();
+      dlg.close();
+    }
+  });
+
+  document.getElementById('btnToday').addEventListener('click', () => scrollToToday(true));
+
+  // Dunkelmodus
+  const themeBtn = document.getElementById('btnTheme');
+  function applyTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    themeBtn.textContent = dark ? '☀️' : '🌙';
+    try { localStorage.setItem('gecko.theme', dark ? 'dark' : 'light'); } catch (e) {}
+  }
+  themeBtn.addEventListener('click', () => applyTheme(!document.body.classList.contains('dark')));
+  let storedTheme = null;
+  try { storedTheme = localStorage.getItem('gecko.theme'); } catch (e) {}
+  applyTheme(storedTheme ? storedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Start
+  renderHeader();
+  render();
+  scrollToToday(false);
+})();
+</script>
+</body>
+</html>
